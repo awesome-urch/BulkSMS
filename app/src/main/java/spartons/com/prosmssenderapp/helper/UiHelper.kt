@@ -55,11 +55,11 @@ class UiHelper {
     }
 
     fun showSelectContactFileDialog(activity: Activity, selectedFileClosure: (File) -> Unit) {
-        val myFilter: FileFilter = { it.name.endsWith(".txt") || it.isDirectory }
+        val myFilter: FileFilter = { it.name.endsWith(".txt") || it.isDirectory || it.name.endsWith(".csv") }
         MaterialDialog(activity).show {
             cornerRadius(16f)
             noAutoDismiss()
-            title(text = "Choose Contact file with .txt extension")
+            title(text = "Choose Contact file with .txt extension or .csv extension")
             positiveButton(text = "SELECT")
             negativeButton(text = "CANCEL") { materialDialog ->
                 materialDialog.dismiss()

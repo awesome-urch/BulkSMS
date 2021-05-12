@@ -56,7 +56,7 @@ class SendBulkSmsActivity : AppCompatActivity(){
          * If the app has the read_phone_state permission then read all the carrier numbers used by this device. Else show a dialog why app needs this permission and simply ask for it.
          */
 
-        if (isHasPermission(Manifest.permission.READ_PHONE_STATE))
+        /*if (isHasPermission(Manifest.permission.READ_PHONE_STATE))
             viewModel.handleDeviceCarrierNumbers()
         else uiHelper.showSimpleMaterialDialog(
             this, R.string.allow_following_permission,
@@ -68,13 +68,14 @@ class SendBulkSmsActivity : AppCompatActivity(){
                 arrayOf(Manifest.permission.READ_PHONE_STATE),
                 ASK_READ_PHONE_STATE_PERMISSION_REQUEST_CODE
             )
-        }
+        }*/
 
         /**
          *
          */
 
         sendBulkSmsChooseFileButton.setOnClickListener {
+            //showFileSelectorDialog()
             if (isHasPermission(Manifest.permission.READ_EXTERNAL_STORAGE))
                 showFileSelectorDialog()
             else
@@ -154,12 +155,13 @@ class SendBulkSmsActivity : AppCompatActivity(){
                     getResourceString(R.string.sms_content_cannot_be_empty)
                 return@setOnClickListener
             }
-            if (isHasPermission(Manifest.permission.SEND_SMS)) sendBulkSms()
+            sendBulkSms()
+            /*if (isHasPermission(Manifest.permission.SEND_SMS)) sendBulkSms()
             else
                 askPermission(
                     arrayOf(Manifest.permission.SEND_SMS),
                     ASK_SMS_PERMISSION_REQUEST_CODE
-                )
+                )*/
         }
 
         /**

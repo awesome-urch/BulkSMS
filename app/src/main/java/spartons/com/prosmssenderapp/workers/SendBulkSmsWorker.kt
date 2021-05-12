@@ -6,19 +6,34 @@ import android.telephony.SmsManager
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
-import kotlinx.coroutines.delay
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonParser
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
+import org.json.JSONObject
 import org.koin.core.KoinComponent
 import org.koin.core.inject
+import retrofit2.Retrofit
+import spartons.com.prosmssenderapp.BuildConfig.ACCOUNT_SID
+import spartons.com.prosmssenderapp.BuildConfig.AUTH_TOKEN
 import spartons.com.prosmssenderapp.R
 import spartons.com.prosmssenderapp.backend.MyCustomApplication.Companion.APPLICATION_CHANNEL
 import spartons.com.prosmssenderapp.helper.NotificationIdHelper
 import spartons.com.prosmssenderapp.helper.SharedPreferenceHelper
 import spartons.com.prosmssenderapp.helper.SharedPreferenceHelper.Companion.BULKS_SMS_PREVIOUS_WORKER_ID
-import spartons.com.prosmssenderapp.helper.SharedPreferenceHelper.Companion.BULK_SMS_MESSAGE_DELAY_SECONDS
 import spartons.com.prosmssenderapp.helper.SharedPreferenceHelper.Companion.BULK_SMS_PREFERRED_CARRIER_NUMBER
 import spartons.com.prosmssenderapp.roomPersistence.BulkSmsDao
 import spartons.com.prosmssenderapp.roomPersistence.BulkSmsStatus
 import spartons.com.prosmssenderapp.util.Constants
+import spartons.com.prosmssenderapp.util.Constants.BASE_URL
 import spartons.com.prosmssenderapp.util.notificationBuilder
 import spartons.com.prosmssenderapp.util.notificationManager
 import timber.log.Timber
@@ -81,6 +96,157 @@ class SendBulkSmsWorker constructor(
     }
 
     override suspend fun doWork(): Result {
+
+        /*curl -X POST https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Messages.json \
+        --data-urlencode "From=+15017122661" \
+        --data-urlencode "Body=body" \
+        --data-urlencode "To=+15558675310" \
+        -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN*/
+
+//        val client: OkHttpClient = Builder()
+//            .addInterceptor(BasicAuthInterceptor(username, password))
+//            .build()
+
+        val loggingInterceptor = HttpLoggingInterceptor()
+        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY)
+
+        val client: OkHttpClient = OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor(
+                BasicAuthInterceptor(
+                    ACCOUNT_SID,
+                    AUTH_TOKEN
+                )
+        ).addInterceptor(Interceptor { chain ->
+            val newRequest: Request = chain.request().newBuilder()
+                //.header(BuildConfig.ACCOUNT_SID, BuildConfig.AUTH_TOKEN)
+                //.addHeader(BuildConfig.ACCOUNT_SID, BuildConfig.AUTH_TOKEN) //QUMxZWFlYThmMTEyOGIwYjkzNmE3M2E1NjBjYjY4MzJiNjo1ZDMxYTA0M2M4YzE0YjkzNmQ1Y2JiOWMzNjZiYmJlYQ==
+//                .addHeader(
+//                    "Authorization",
+//                    "Basic QUMxZWFlYThmMTEyOGIwYjkzNmE3M2E1NjBjYjY4MzJiNjo1ZDMxYTA0M2M4YzE0YjkzNmQ1Y2JiOWMzNjZiYmJlYQ"
+//                )
+
+                .build()
+            chain.proceed(newRequest)
+        }).build()
+
+        val retrofit: Retrofit = Retrofit.Builder()
+            .client(client)
+            .baseUrl(BASE_URL)
+            //.addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        Timber.e("Worker starts")
+        // Create Retrofit
+//        val retrofit = Retrofit.Builder()
+//            .baseUrl("https://api.twilio.com")
+//            .build()
+
+        // Create Service
+        val service = retrofit.create(APIService::class.java)
+
+        // Create JSON using JSONObject
+        val jsonObject = JSONObject()
+        jsonObject.put("From", "Danziga")
+        jsonObject.put("Body", "This is cool I am over killing it")
+        jsonObject.put("To", "+2348085623399")
+
+        // Convert JSONObject to String
+        val jsonObjectString = jsonObject.toString()
+
+        // Create RequestBody ( We're not using any converter, like GsonConverter, MoshiConverter e.t.c, that's why we use RequestBody )
+        val requestBody = jsonObjectString.toRequestBody("application/json".toMediaTypeOrNull())
+
+        CoroutineScope(Dispatchers.IO).launch {
+            // Do the POST request and get response
+            //val response = service.sendSms(requestBody)
+
+            val response = service.pushSms("Danziga","+2348085623399","This is cool I am over killing it")
+
+            withContext(Dispatchers.Main) {
+                if (response.isSuccessful) {
+
+                    // Convert raw JSON to pretty JSON using GSON library
+                    val gson = GsonBuilder().setPrettyPrinting().create()
+                    val prettyJson = gson.toJson(
+                        JsonParser.parseString(
+                            response.body()
+                                ?.string() // About this thread blocking annotation : https://github.com/square/retrofit/issues/3255
+                        )
+                    )
+                    //Log.d("Pretty Printed JSON :", prettyJson)
+
+                    Timber.d("Pretty Printed JSON : $prettyJson")
+
+//                    val intent = Intent(this@MainActivity, DetailsActivity::class.java)
+//                    intent.putExtra("json_results", prettyJson)
+//                    this@MainActivity.startActivity(intent)
+
+                } else {
+
+                    //Log.e("RETROFIT_ERROR", response.code().toString())
+
+                    Timber.d("RETROFIT_ERROR ${response.code()}")
+
+                }
+            }
+        }
+
+        Timber.e("Worker ends")
+        setNotificationCompleteStatus()
+        val endTime = System.currentTimeMillis()
+        bulkSmsDao.update(endTime, BulkSmsStatus.COMPLETE, rowId)
+        sharedPreferenceHelper.put(BULKS_SMS_PREVIOUS_WORKER_ID, null)
+        Timber.e("Worker ends")
+        return Result.success()
+
+
+        /*Timber.e("Worker starts")
+        val bulkSms = bulkSmsDao.bulkSmsWithRowId(rowId)
+        val smsContacts = bulkSms.smsContacts
+        val contactListSize = smsContacts.count()
+        val remainSmsSentNumbers = smsContacts.filter { !it.isSent }
+        var smsCountProgress = contactListSize - remainSmsSentNumbers.count()
+        notificationManager.notify(
+            notificationId, notificationBuilder.setProgress(
+                contactListSize, smsCountProgress, false
+            ).build()
+        )
+        val smsDelayValue =
+            (sharedPreferenceHelper.getInt(BULK_SMS_MESSAGE_DELAY_SECONDS).toLong()) * 1000
+        val smsContent = bulkSms.smsContent
+        val smsDivides = smsManager.divideMessage(smsContent)
+        val sourceSmsAddress = sharedPreferenceHelper.getString(BULK_SMS_PREFERRED_CARRIER_NUMBER)
+        Timber.e("Source sms address -> $sourceSmsAddress and content -> $smsContent")
+        for (smsContact in remainSmsSentNumbers) {
+            if (smsContent.length < SMS_CONTENT_LENGTH_LIMIT)
+                smsManager.sendTextMessage(
+                    smsContact.contactNumber, null, smsContent, null, null
+                )
+            else
+                smsManager.sendMultipartTextMessage(
+                    smsContact.contactNumber, null, smsDivides, null, null
+                )
+            delay(smsDelayValue)
+            notificationBuilder.setProgress(contactListSize, ++smsCountProgress, false)
+                .setContentTitle(SENDING_BULK_SMS.plus(" $smsCountProgress/$contactListSize"))
+                .also {
+                    notificationManager.notify(notificationId, it.build())
+                }
+            smsContact.isSent = true
+            bulkSmsDao.update(smsContacts, rowId)
+        }
+        setNotificationCompleteStatus()
+        val endTime = System.currentTimeMillis()
+        bulkSmsDao.update(endTime, BulkSmsStatus.COMPLETE, rowId)
+        sharedPreferenceHelper.put(BULKS_SMS_PREVIOUS_WORKER_ID, null)
+        Timber.e("Worker ends")
+        return Result.success()*/
+    }
+
+    /*
+
+    override suspend fun doWork(): Result {
         Timber.e("Worker starts")
         val bulkSms = bulkSmsDao.bulkSmsWithRowId(rowId)
         val smsContacts = bulkSms.smsContacts
@@ -123,4 +289,8 @@ class SendBulkSmsWorker constructor(
         Timber.e("Worker ends")
         return Result.success()
     }
+
+    */
+
+
 }

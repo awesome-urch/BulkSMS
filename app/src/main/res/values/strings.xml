@@ -47,8 +47,10 @@
     </string>-->
     <string name="all_sms_history_deleted_successfully">All sms history deleted successfully.</string>
     <string name="about_app_content">-> Get your messages across with Pro Sms Bulk Sender App. Using this platform you can quickly send any short and important message to worldwide or locally in your country. You can easily send SMS alerts or promotional messages from your mobile. The sms charges may apply for sending the messages. \n\n -> This is a small and powerful application that enables users to send generic and customized SMS messages through their carrier network to contact that are listed in a .txt input file. \n\n Contact Me\n\n <strong>email: </strong>ahsansaeed067@gmail.com\n <strong>Website: </strong>ahsensaeed.com/contact-me</string>
-    <string name="sms_sent_successfully_content">All sms of recipients will be sent successfully. You can track progress
+    <!--<string name="sms_sent_successfully_content">All sms of recipients will be sent successfully. You can track progress
         in the notification bar.
+    </string>-->
+    <string name="sms_sent_successfully_content">All sms of recipients will be sent successfully.
     </string>
     <string name="bulk_sms_sent">Bulk Sms Sent</string>
     <string name="feature_not_added_yet">Feature not added yet.</string>

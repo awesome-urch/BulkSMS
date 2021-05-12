@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.opencsv.CSVReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -26,9 +27,11 @@ import spartons.com.prosmssenderapp.util.Event
 import spartons.com.prosmssenderapp.util.enqueueWorker
 import spartons.com.prosmssenderapp.util.subscriptionManager
 import spartons.com.prosmssenderapp.workers.SendBulkSmsWorker
+import timber.log.Timber
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
+import java.io.IOException
 
 
 /**
@@ -87,17 +90,58 @@ class SendBulkSmsViewModel constructor(
     }
 
     fun handleSelectedFile(selectedFile: File) {
+
         viewModelScope.launch(coroutineContext) {
-            emitUiState(showProgress = true)
-            BufferedReader(FileReader(selectedFile)).use {
-                val filteredContactList = it.readLines()
-                    .filter { contactNumber ->
-                        contactNumber.length > 6
+            Timber.d("file $selectedFile")
+            if(selectedFile.name.endsWith(".txt")){
+                Timber.d("ends with txt")
+                emitUiState(showProgress = true)
+                BufferedReader(FileReader(selectedFile)).use {
+                    val filteredContactList = it.readLines()
+                        .filter { contactNumber ->
+                            contactNumber.length > 6
+                        }
+                    if (filteredContactList.isNotEmpty())
+                        emitUiState(contactList = Event(filteredContactList))
+                    else
+                        emitUiState(showMessage = Event(R.string.the_selected_file_is_empty))
+                }
+            }else if(selectedFile.name.endsWith(".csv")){
+
+                val filteredContactList = arrayListOf<String>()
+                Timber.d("ends with csv")
+                try {
+                    val reader = CSVReader(FileReader(selectedFile))
+                    var nextLine: Array<String>
+
+                    //val header = reader.readNext()
+
+                    // Read the rest
+                    var line: Array<String>? = reader.readNext()
+                    while (line != null) {
+                        // Do something with the data
+                        Timber.d("line is ${line[0]}")
+
+                        filteredContactList.add(line[0])
+
+                        line = reader.readNext()
                     }
-                if (filteredContactList.isNotEmpty())
-                    emitUiState(contactList = Event(filteredContactList))
-                else
-                    emitUiState(showMessage = Event(R.string.the_selected_file_is_empty))
+
+                    if (filteredContactList.isNotEmpty())
+                        emitUiState(contactList = Event(filteredContactList))
+                    else
+                        emitUiState(showMessage = Event(R.string.the_selected_file_is_empty))
+
+//                    while (reader.readNext().also { nextLine = it } != null) {
+//                        // nextLine[] is an array of values from the line
+//                        //println(nextLine[0] + nextLine[1] + "etc...")
+//                        //Timber.d("line is ${nextLine[0]}")
+//
+//                    }
+                } catch (e: IOException) {
+                    Timber.d("$e")
+                }
+
             }
         }
     }
@@ -127,6 +171,9 @@ class SendBulkSmsViewModel constructor(
             sharedPreferenceHelper.put(BULKS_SMS_PREVIOUS_WORKER_ID, worker.id.toString())
         }
     }
+
+
+
 }
 
 data class SendBulkSmsUiModel(

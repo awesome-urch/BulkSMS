@@ -10,4 +10,5 @@ package spartons.com.prosmssenderapp.util
 object Constants {
 
     const val CARRIER_NAME_SPLITTER = ":"
+    const val BASE_URL = "https://api.twilio.com/2010-04-01/"
 }
