@@ -5,7 +5,7 @@
     <string name="history">History</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>
-    <string name="choose_a_txt_file">Choose a .txt file</string>
+    <string name="choose_a_txt_file">Choose a .txt or .csv file</string>
     <string name="message">Write your message here</string>
     <string name="send_bulk_sms">Send Bulk Sms</string>
     <string name="storage_permission_denied_content">Pro Sms Sender App requires the <b>Storage Permission</b> in order to read
@@ -76,4 +76,5 @@
     <string name="limit_exceeds_please_send_bulk_sms_less_than_thousand_contacts">Limit exceeds please send bulk sms less than thousand contacts</string>
     <string name="number_of_contacts_showing">Number of contacts showing : %1$d</string>
     <string name="contact_list_must_not_be_empty">Contact list must not be empty!</string>
+    <string name="title">Title</string>
 </resources>

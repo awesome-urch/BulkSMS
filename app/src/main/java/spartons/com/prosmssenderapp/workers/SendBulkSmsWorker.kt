@@ -107,90 +107,78 @@ class SendBulkSmsWorker constructor(
 //            .addInterceptor(BasicAuthInterceptor(username, password))
 //            .build()
 
-        val loggingInterceptor = HttpLoggingInterceptor()
-        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY)
-
-        val client: OkHttpClient = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .addInterceptor(
-                BasicAuthInterceptor(
-                    ACCOUNT_SID,
-                    AUTH_TOKEN
-                )
-        ).addInterceptor(Interceptor { chain ->
-            val newRequest: Request = chain.request().newBuilder()
-                //.header(BuildConfig.ACCOUNT_SID, BuildConfig.AUTH_TOKEN)
-                //.addHeader(BuildConfig.ACCOUNT_SID, BuildConfig.AUTH_TOKEN) //QUMxZWFlYThmMTEyOGIwYjkzNmE3M2E1NjBjYjY4MzJiNjo1ZDMxYTA0M2M4YzE0YjkzNmQ1Y2JiOWMzNjZiYmJlYQ==
-//                .addHeader(
-//                    "Authorization",
-//                    "Basic QUMxZWFlYThmMTEyOGIwYjkzNmE3M2E1NjBjYjY4MzJiNjo1ZDMxYTA0M2M4YzE0YjkzNmQ1Y2JiOWMzNjZiYmJlYQ"
-//                )
-
-                .build()
-            chain.proceed(newRequest)
-        }).build()
-
-        val retrofit: Retrofit = Retrofit.Builder()
-            .client(client)
-            .baseUrl(BASE_URL)
-            //.addConverterFactory(GsonConverterFactory.create())
-            .build()
-
         Timber.e("Worker starts")
-        // Create Retrofit
-//        val retrofit = Retrofit.Builder()
-//            .baseUrl("https://api.twilio.com")
-//            .build()
+        val bulkSms = bulkSmsDao.bulkSmsWithRowId(rowId)
+        val smsContacts = bulkSms.smsContacts
+        val contactListSize = smsContacts.count()
+        val smsContent = bulkSms.smsContent
+        val remainSmsSentNumbers = smsContacts.filter { !it.isSent }
+        var smsCountProgress = contactListSize - remainSmsSentNumbers.count()
 
-        // Create Service
-        val service = retrofit.create(APIService::class.java)
+        Timber.d("content is $smsContent && bulk is $bulkSms")
 
-        // Create JSON using JSONObject
-        val jsonObject = JSONObject()
-        jsonObject.put("From", "Danziga")
-        jsonObject.put("Body", "This is cool I am over killing it")
-        jsonObject.put("To", "+2348085623399")
+        for (smsContact in remainSmsSentNumbers) {
 
-        // Convert JSONObject to String
-        val jsonObjectString = jsonObject.toString()
+            val loggingInterceptor = HttpLoggingInterceptor()
+            loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY)
 
-        // Create RequestBody ( We're not using any converter, like GsonConverter, MoshiConverter e.t.c, that's why we use RequestBody )
-        val requestBody = jsonObjectString.toRequestBody("application/json".toMediaTypeOrNull())
-
-        CoroutineScope(Dispatchers.IO).launch {
-            // Do the POST request and get response
-            //val response = service.sendSms(requestBody)
-
-            val response = service.pushSms("Danziga","+2348085623399","This is cool I am over killing it")
-
-            withContext(Dispatchers.Main) {
-                if (response.isSuccessful) {
-
-                    // Convert raw JSON to pretty JSON using GSON library
-                    val gson = GsonBuilder().setPrettyPrinting().create()
-                    val prettyJson = gson.toJson(
-                        JsonParser.parseString(
-                            response.body()
-                                ?.string() // About this thread blocking annotation : https://github.com/square/retrofit/issues/3255
-                        )
+            val client: OkHttpClient = OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
+                .addInterceptor(
+                    BasicAuthInterceptor(
+                        ACCOUNT_SID,
+                        AUTH_TOKEN
                     )
-                    //Log.d("Pretty Printed JSON :", prettyJson)
+                ).addInterceptor(Interceptor { chain ->
+                    val newRequest: Request = chain.request().newBuilder()
+                        .build()
+                    chain.proceed(newRequest)
+                }).build()
 
-                    Timber.d("Pretty Printed JSON : $prettyJson")
+            val retrofit: Retrofit = Retrofit.Builder()
+                .client(client)
+                .baseUrl(BASE_URL)
+                //.addConverterFactory(GsonConverterFactory.create())
+                .build()
 
-//                    val intent = Intent(this@MainActivity, DetailsActivity::class.java)
-//                    intent.putExtra("json_results", prettyJson)
-//                    this@MainActivity.startActivity(intent)
+            // Create Service
+            val service = retrofit.create(APIService::class.java)
 
-                } else {
+            CoroutineScope(Dispatchers.IO).launch {
 
-                    //Log.e("RETROFIT_ERROR", response.code().toString())
+                val response = service.pushSms("Danziga",smsContact.contactNumber,smsContent)
 
-                    Timber.d("RETROFIT_ERROR ${response.code()}")
+                withContext(Dispatchers.Main) {
+                    if (response.isSuccessful) {
 
+                        // Convert raw JSON to pretty JSON using GSON library
+                        val gson = GsonBuilder().setPrettyPrinting().create()
+                        val prettyJson = gson.toJson(
+                            JsonParser.parseString(
+                                response.body()
+                                    ?.string() // About this thread blocking annotation : https://github.com/square/retrofit/issues/3255
+                            )
+                        )
+
+                        Timber.d("Pretty Printed JSON : $prettyJson")
+
+                    } else {
+
+                        Timber.d("RETROFIT_ERROR ${response.code()}")
+
+                    }
                 }
             }
+
+            notificationBuilder.setProgress(contactListSize, ++smsCountProgress, false)
+                .setContentTitle(SENDING_BULK_SMS.plus(" $smsCountProgress/$contactListSize"))
+                .also {
+                    notificationManager.notify(notificationId, it.build())
+                }
+            smsContact.isSent = true
+            bulkSmsDao.update(smsContacts, rowId)
         }
+
 
         Timber.e("Worker ends")
         setNotificationCompleteStatus()
@@ -243,54 +231,5 @@ class SendBulkSmsWorker constructor(
         Timber.e("Worker ends")
         return Result.success()*/
     }
-
-    /*
-
-    override suspend fun doWork(): Result {
-        Timber.e("Worker starts")
-        val bulkSms = bulkSmsDao.bulkSmsWithRowId(rowId)
-        val smsContacts = bulkSms.smsContacts
-        val contactListSize = smsContacts.count()
-        val remainSmsSentNumbers = smsContacts.filter { !it.isSent }
-        var smsCountProgress = contactListSize - remainSmsSentNumbers.count()
-        notificationManager.notify(
-            notificationId, notificationBuilder.setProgress(
-                contactListSize, smsCountProgress, false
-            ).build()
-        )
-        val smsDelayValue =
-            (sharedPreferenceHelper.getInt(BULK_SMS_MESSAGE_DELAY_SECONDS).toLong()) * 1000
-        val smsContent = bulkSms.smsContent
-        val smsDivides = smsManager.divideMessage(smsContent)
-        val sourceSmsAddress = sharedPreferenceHelper.getString(BULK_SMS_PREFERRED_CARRIER_NUMBER)
-        Timber.e("Source sms address -> $sourceSmsAddress and content -> $smsContent")
-        for (smsContact in remainSmsSentNumbers) {
-            if (smsContent.length < SMS_CONTENT_LENGTH_LIMIT)
-                smsManager.sendTextMessage(
-                    smsContact.contactNumber, null, smsContent, null, null
-                )
-            else
-                smsManager.sendMultipartTextMessage(
-                    smsContact.contactNumber, null, smsDivides, null, null
-                )
-            delay(smsDelayValue)
-            notificationBuilder.setProgress(contactListSize, ++smsCountProgress, false)
-                .setContentTitle(SENDING_BULK_SMS.plus(" $smsCountProgress/$contactListSize"))
-                .also {
-                    notificationManager.notify(notificationId, it.build())
-                }
-            smsContact.isSent = true
-            bulkSmsDao.update(smsContacts, rowId)
-        }
-        setNotificationCompleteStatus()
-        val endTime = System.currentTimeMillis()
-        bulkSmsDao.update(endTime, BulkSmsStatus.COMPLETE, rowId)
-        sharedPreferenceHelper.put(BULKS_SMS_PREVIOUS_WORKER_ID, null)
-        Timber.e("Worker ends")
-        return Result.success()
-    }
-
-    */
-
 
 }

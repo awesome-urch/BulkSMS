@@ -185,7 +185,8 @@ class SendBulkSmsActivity : AppCompatActivity(){
             viewModel.checkIfWorkerIsIdle() -> {
                 viewModel.sendBulkSms(
                     currentContacts.toTypedArray(),
-                    sendBulkSmsTextMessageEditText.text.toString()
+                    sendBulkSmsTextMessageEditText.text.toString(),
+                    sendBulkSmsTitleEditText.text.toString()
                 )
                 uiHelper.showSimpleMaterialDialog(
                     this, R.string.bulk_sms_sent,

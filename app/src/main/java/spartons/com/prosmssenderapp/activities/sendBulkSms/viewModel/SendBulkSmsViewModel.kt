@@ -99,7 +99,7 @@ class SendBulkSmsViewModel constructor(
                 BufferedReader(FileReader(selectedFile)).use {
                     val filteredContactList = it.readLines()
                         .filter { contactNumber ->
-                            contactNumber.length > 6
+                            contactNumber.length > 4
                         }
                     if (filteredContactList.isNotEmpty())
                         emitUiState(contactList = Event(filteredContactList))
@@ -149,12 +149,13 @@ class SendBulkSmsViewModel constructor(
     fun checkIfWorkerIsIdle() =
         sharedPreferenceHelper.getString(BULKS_SMS_PREVIOUS_WORKER_ID) == null
 
-    fun sendBulkSms(contactList: Array<String>, smsContent: String) {
+    fun sendBulkSms(contactList: Array<String>, smsContent: String, smsTitle: String) {
         viewModelScope.launch(coroutineContext) {
-            val carrierName =
+            /*val carrierName =
                 sharedPreferenceHelper.getString(BULK_SMS_PREFERRED_CARRIER_NUMBER)?.split(
                     CARRIER_NAME_SPLITTER
-                )?.get(1) ?: ""
+                )?.get(1) ?: ""*/
+            val carrierName = smsTitle
             val bulkSms = BulkSms(
                 smsContacts = contactList.map { it.toSmsContact() }.toList(),
                 smsContent = smsContent, startDateTime = System.currentTimeMillis(),
